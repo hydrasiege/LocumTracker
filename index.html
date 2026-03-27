@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Locum Tracker">
+<meta name="theme-color" content="#0d1117">
+<title>Locum Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --border2: #21262d;
+    --text: #e6edf3; --text2: #8b949e; --text3: #7d8590;
+    --teal: #2ec4b6; --blue: #58a6ff; --amber: #f4a261; --red: #e63946;
+    --h-fair: #00b4d8; --h-gos: #7b2d8b; --h-wyo: #e07b39;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro Display', 'Segoe UI', sans-serif; }
+  body { overflow-x: hidden; }
+
+  /* Header */
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; background: rgba(22,27,34,0.95);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--border2);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon { font-size: 22px; }
+  .brand-title { font-size: 15px; font-weight: 700; letter-spacing: 0.07em; }
+  .brand-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .hstats { display: flex; gap: 18px; }
+  .hstat-n { font-size: 18px; font-weight: 700; line-height: 1; text-align: center; }
+  .hstat-l { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; text-align: center; margin-top: 1px; }
+
+  /* Nav */
+  #nav {
+    display: flex; background: var(--bg); border-bottom: 1px solid var(--border2);
+    position: sticky; top: 57px; z-index: 99; overflow-x: auto;
+  }
+  #nav button {
+    flex: 1; padding: 11px 8px; border: none; background: transparent;
+    color: var(--text3); font-size: 13px; font-weight: 500; cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  #nav button.active { color: var(--text); border-bottom-color: var(--teal); }
+
+  /* Main */
+  #main { padding: 16px 16px 100px; max-width: 700px; margin: 0 auto; }
+
+  /* Section title */
+  .section-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; letter-spacing: 0.02em; }
+
+  /* Cards */
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+  /* Hospital buttons */
+  .hosp-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .hosp-btn {
+    flex: 1; padding: 10px 6px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 13px; font-weight: 600; transition: all 0.15s;
+  }
+  .hosp-btn span.sub { font-size: 9px; font-weight: 400; opacity: 0.75; }
+
+  /* Date row */
+  .date-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 16px; }
+  .date-row .field { flex: 1; }
+
+  /* Fields */
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+  input[type=text], input[type=date] {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text); font-size: 15px; outline: none; width: 100%;
+    -webkit-appearance: none;
+  }
+  input[type=text]::placeholder { color: var(--text3); }
+  .date-hint { font-size: 12px; color: var(--teal); margin-top: 2px; }
+
+  /* Type buttons */
+  .type-row { display: flex; gap: 6px; }
+  .type-btn {
+    flex: 1; padding: 9px 4px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 12px; font-weight: 600; transition: all 0.15s;
+  }
+  .type-btn span.sub { font-size: 9px; font-weight: 400; opacity: 0.8; }
+
+  /* Camera */
+  #cam-wrap { margin-bottom: 14px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); display: none; }
+  #cam-wrap.open { display: block; }
+  #cam-video { width: 100%; display: block; max-height: 260px; object-fit: cover; background: #000; }
+  .cam-btns { display: flex; gap: 8px; padding: 10px; background: var(--bg2); }
+  #btn-capture {
+    flex: 1; padding: 12px; border-radius: 8px; border: none;
+    background: var(--teal); color: #0d1117; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  #btn-cam-cancel {
+    padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2); font-size: 13px; cursor: pointer;
+  }
+  #btn-open-cam {
+    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text); font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #scanning-msg {
+    padding: 10px 14px; border-radius: 8px; background: #0d2a1a;
+    border: 1px solid rgba(46,196,182,0.2); color: var(--teal);
+    font-size: 13px; margin-bottom: 14px; display: none;
+  }
+  #cam-error {
+    padding: 10px 14px; border-radius: 8px; background: #1a0e0e;
+    border: 1px solid rgba(230,57,70,0.3); color: #e07070;
+    font-size: 13px; margin-bottom: 12px; display: none;
+  }
+
+  /* Add button */
+  #btn-add {
+    width: 100%; padding: 13px; border-radius: 10px;
+    border: 1px solid rgba(46,196,182,0.2); background: rgba(46,196,182,0.08);
+    color: var(--teal); cursor: pointer; font-size: 15px; font-weight: 700;
+    margin-top: 4px;
+  }
+
+  /* Drive bar */
+  .drive-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg2); margin-bottom: 8px;
+  }
+  .drive-path { font-size: 12px; color: var(--text3); }
+  .drive-path strong { color: var(--text); }
+  .drive-path .date-part { color: var(--blue); }
+  #btn-sync {
+    padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--blue); cursor: pointer; font-size: 12px; font-weight: 500;
+    white-space: nowrap;
+  }
+  #sync-result {
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px;
+    display: none; line-height: 1.5;
+  }
+  #sync-result.ok  { background: #0d2a1a; border: 1px solid rgba(46,196,182,0.2); color: var(--teal); }
+  #sync-result.err { background: #1a0e0e; border: 1px solid rgba(230,57,70,0.3);  color: #e07070; }
+
+  /* Patient cards */
+  .patient-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .patient-card.age-red   { border-color: rgba(230,57,70,0.35);   background: #1a0e0e; }
+  .patient-card.age-amber { border-color: rgba(244,162,97,0.35);  background: #1a160a; }
+  .pc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .pc-name { font-size: 15px; font-weight: 600; }
+  .pc-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .pc-del { background: transparent; border: none; color: #444; cursor: pointer; font-size: 16px; padding: 2px 6px; }
+  .pc-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chip {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 500;
+  }
+  .pc-proc { font-size: 12px; color: var(--text2); font-style: italic; margin-bottom: 10px; }
+  .task-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; cursor: pointer; border-bottom: 1px solid var(--border2);
+  }
+  .task-row:last-child { border-bottom: none; }
+  .checkbox {
+    width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0;
+    border: 1.5px solid #444; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #0d1117; transition: all 0.15s;
+  }
+  .checkbox.done { background: var(--teal); border-color: var(--teal); }
+  .task-label { font-size: 13px; color: var(--text2); }
+  .task-label.done { text-decoration: line-through; color: #444; }
+  .pc-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border2); font-size: 11px; color: #666; }
+  .pc-footer.all-done { color: var(--teal); }
+
+  /* Filter bar */
+  .filter-bar { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
+  .filter-btn {
+    padding: 5px 12px; border-radius: 16px; border: 1px solid var(--border);
+    background: transparent; color: var(--text3); cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .filter-btn.active { background: var(--bg3); color: var(--text); border-color: var(--blue); }
+
+  /* Pending rows */
+  .pend-row {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .pend-row.age-red   { border-color: rgba(230,57,70,0.35);  background: #1a0e0e; }
+  .pend-row.age-amber { border-color: rgba(244,162,97,0.35); background: #1a160a; }
+  .pend-name { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+  .pend-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .pend-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; min-width: 120px; }
+  .pend-task  { font-size: 12px; color: var(--text2); font-weight: 500; text-align: right; }
+  .age-label  { font-size: 11px; font-weight: 600; }
+  .btn-done {
+    padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(46,196,182,0.2);
+    background: rgba(46,196,182,0.08); color: var(--teal); cursor: pointer; font-size: 12px; font-weight: 500;
+  }
+
+  /* Session meta */
+  .session-meta { font-size: 12px; color: var(--text3); margin: 16px 0 10px; }
+
+  /* Empty */
+  .empty { text-align: center; color: #444; font-size: 14px; padding: 50px 0; }
+
+  /* API key prompt */
+  #apikey-banner {
+    background: #1a1608; border: 1px solid rgba(244,162,97,0.3); border-radius: 10px;
+    padding: 14px; margin-bottom: 16px; font-size: 13px; color: var(--amber); line-height: 1.6;
+  }
+  #apikey-banner input {
+    margin-top: 8px; width: 100%; padding: 9px 12px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 13px; outline: none;
+  }
+  #apikey-banner button {
+    margin-top: 8px; padding: 8px 16px; border-radius: 6px; border: none;
+    background: var(--amber); color: #0d1117; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <div class="brand">
+    <span class="brand-icon">⚕</span>
+    <div>
+      <div class="brand-title">LOCUM TRACKER</div>
+      <div class="brand-sub">Dr Ma · Hand Surgery</div>
+    </div>
+  </div>
+  <div class="hstats">
+    <div><div class="hstat-n" id="stat-patients" style="color:#00b4d8">0</div><div class="hstat-l">Patients</div></div>
+    <div><div class="hstat-n" id="stat-pending"  style="color:#f4a261">0</div><div class="hstat-l">Pending</div></div>
+    <div><div class="hstat-n" id="stat-overdue"  style="color:#e63946">0</div><div class="hstat-l">Overdue</div></div>
+  </div>
+</div>
+
+<!-- Nav -->
+<div id="nav">
+  <button onclick="setView('session')"   class="active" id="nav-session">🏥 Session</button>
+  <button onclick="setView('dashboard')" id="nav-dashboard">📋 All Patients</button>
+  <button onclick="setView('pending')"   id="nav-pending">⏳ Pending</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- ── SESSION VIEW ── -->
+  <div id="view-session">
+    <div class="section-title">Session Entry</div>
+
+    <!-- API key banner -->
+    <div id="apikey-banner">
+      🔑 <strong>Anthropic API key required</strong> for AI front-sheet scanning.<br>
+      Enter your key once — it's saved locally on this device only.<br>
+      <input type="text" id="apikey-input" placeholder="sk-ant-..." autocomplete="off" />
+      <button onclick="saveApiKey()">Save Key</button>
+    </div>
+
+    <!-- Hospital selector -->
+    <div class="field"><label>Hospital</label></div>
+    <div class="hosp-row">
+      <button class="hosp-btn" id="hbtn-fairfield" onclick="selectHospital('fairfield')" style="border-color:#00b4d8;color:#00b4d8">
+        Fairfield<span class="sub">sessional</span>
+      </button>
+      <button class="hosp-btn" id="hbtn-gosford" onclick="selectHospital('gosford')">
+        Gosford<span class="sub">sessional</span>
+      </button>
+      <button class="hosp-btn" id="hbtn-wyong" onclick="selectHospital('wyong')">
+        Wyong<span class="sub">fee-for-svc</span>
+      </button>
+    </div>
+
+    <!-- Date -->
+    <div class="field">
+      <label>Date (YYMMDD)</label>
+      <input type="text" id="date-input" maxlength="6" placeholder="260321" oninput="onDateInput()" />
+      <div class="date-hint" id="date-hint"></div>
+    </div>
+
+    <!-- Drive sync -->
+    <div class="drive-bar">
+      <div class="drive-path">📁 <strong id="drive-folder-name">Locum - Fairfield</strong> / <span class="date-part" id="drive-date-part">—</span></div>
+      <button id="btn-sync" onclick="syncDrive()">↓ Sync Drive</button>
+    </div>
+    <div id="sync-result"></div>
+
+    <!-- Add patient card -->
+    <div class="card">
+      <div class="card-title">Add Patient</div>
+
+      <!-- Camera -->
+      <div id="cam-error"></div>
+      <div id="scanning-msg">⏳ Analysing front sheet with AI…</div>
+      <div id="cam-wrap">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <div class="cam-btns">
+          <button id="btn-capture" onclick="captureAndScan()">📸 Capture &amp; Scan</button>
+          <button id="btn-cam-cancel" onclick="closeCamera()">Cancel</button>
+        </div>
+      </div>
+      <button id="btn-open-cam" onclick="openCamera()">📷 Open Camera — Scan Front Sheet</button>
+
+      <!-- Form -->
+      <div class="field">
+        <label>Patient name</label>
+        <input type="text" id="f-name" placeholder="SURNAME, Firstname" />
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="field" style="flex:1">
+          <label>UR / MRN</label>
+          <input type="text" id="f-ur" placeholder="123456" />
+        </div>
+        <div class="field" style="flex:1">
+          <label>DOB</label>
+          <input type="text" id="f-dob" placeholder="DD/MM/YYYY" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Type → Billing</label>
+        <div class="type-row">
+          <button class="type-btn" id="tbtn-public" onclick="selectType('public')" style="border-color:#2ec4b6;color:#2ec4b6">
+            Public<span class="sub">B-Money</span>
+          </button>
+          <button class="type-btn" id="tbtn-private" onclick="selectType('private')">
+            Private<span class="sub">Xestro</span>
+          </button>
+          <button class="type-btn" id="tbtn-workcover" onclick="selectType('workcover')">
+            WorkCover<span class="sub">Tyro Health</span>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Procedure</label>
+        <input type="text" id="f-proc" placeholder="e.g. Right carpal tunnel decompression" />
+      </div>
+      <button id="btn-add" onclick="addPatient()">+ Add to Session</button>
+    </div>
+
+    <!-- Session list -->
+    <div class="session-meta" id="session-meta"></div>
+    <div id="session-list"></div>
+  </div>
+
+  <!-- ── DASHBOARD VIEW ── -->
+  <div id="view-dashboard" style="display:none">
+    <div class="section-title">All Patients</div>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Has pending</button>
+      <button class="filter-btn" onclick="setFilter('done',this)">All done</button>
+      <button class="filter-btn" onclick="setFilter('red',this)">🔴 Overdue</button>
+      <button class="filter-btn" onclick="setFilter('amber',this)">🟡 Due soon</button>
+    </div>
+    <div id="dashboard-list"></div>
+  </div>
+
+  <!-- ── PENDING VIEW ── -->
+  <div id="view-pending" style="display:none">
+    <div class="section-title">Pending Tasks</div>
+    <div id="pending-list"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const HOSPITALS = {
+  fairfield: { label:'Fairfield', folder:'Locum - Fairfield', billing:'sessional',       color:'#00b4d8' },
+  gosford:   { label:'Gosford',   folder:'Locum - Gosford',   billing:'sessional',       color:'#7b2d8b' },
+  wyong:     { label:'Wyong',     folder:'Locum - Wyong',     billing:'fee-for-service', color:'#e07b39' },
+};
+const PTYPES = {
+  public:    { label:'Public',    system:'B-Money',     color:'#2ec4b6' },
+  private:   { label:'Private',   system:'Xestro',      color:'#f4a261' },
+  workcover: { label:'WorkCover', system:'Tyro Health', color:'#e63946' },
+};
+const TASKS = [
+  { id:'billed',   label:'Bill submitted'      },
+  { id:'notes',    label:'Op note / dictation' },
+  { id:'followup', label:'Follow-up booked'    },
+  { id:'consent',  label:'Consent documented'  },
+];
+const AMBER_MS = 7  * 86400000;
+const RED_MS   = 14 * 86400000;
+const STORAGE_KEY = 'locum_v4';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let db           = loadDB();
+let curHospital  = 'fairfield';
+let curType      = 'public';
+let curFilter    = 'all';
+let camStream    = null;
+
+// ── DB ─────────────────────────────────────────────────────────────────────
+function loadDB() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveDB() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+}
+
+// ── API key ────────────────────────────────────────────────────────────────
+function getApiKey() { return localStorage.getItem('locum_apikey') || ''; }
+function saveApiKey() {
+  const k = document.getElementById('apikey-input').value.trim();
+  if (!k) return;
+  localStorage.setItem('locum_apikey', k);
+  document.getElementById('apikey-banner').style.display = 'none';
+  alert('API key saved ✓');
+}
+function initApiBanner() {
+  if (getApiKey()) document.getElementById('apikey-banner').style.display = 'none';
+  else document.getElementById('apikey-input').value = '';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function staleness(ts) {
+  if (!ts) return 'ok';
+  const age = Date.now() - ts;
+  if (age >= RED_MS)   return 'red';
+  if (age >= AMBER_MS) return 'amber';
+  return 'ok';
+}
+function displayDate(yymmdd) {
+  const m = (yymmdd||'').match(/^(\d{2})(\d{2})(\d{2})$/);
+  if (!m) return yymmdd || '—';
+  return `${m[3]}/${m[2]}/20${m[1]}`;
+}
+function todayYYMMDD() {
+  const t = new Date();
+  return String(t.getFullYear()).slice(2)
+    + String(t.getMonth()+1).padStart(2,'0')
+    + String(t.getDate()).padStart(2,'0');
+}
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function chip(bg, color, text) {
+  return `<span class="chip" style="background:${bg};color:${color}">${esc(text)}</span>`;
+}
+
+// ── Init date input ────────────────────────────────────────────────────────
+function initDate() {
+  const d = document.getElementById('date-input');
+  d.value = todayYYMMDD();
+  updateDateHint();
+  updateDrivePath();
+}
+function onDateInput() { updateDateHint(); updateDrivePath(); renderSession(); }
+function updateDateHint() {
+  const v = document.getElementById('date-input').value;
+  document.getElementById('date-hint').textContent = displayDate(v);
+}
+function getDate() { return document.getElementById('date-input').value; }
+
+// ── Hospital selection ─────────────────────────────────────────────────────
+function selectHospital(id) {
+  curHospital = id;
+  Object.keys(HOSPITALS).forEach(k => {
+    const btn = document.getElementById('hbtn-'+k);
+    const h = HOSPITALS[k];
+    if (k === id) {
+      btn.style.background = h.color;
+      btn.style.color = '#0d1117';
+      btn.style.borderColor = h.color;
+    } else {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  });
+  updateDrivePath();
+  renderSession();
+}
+function updateDrivePath() {
+  document.getElementById('drive-folder-name').textContent = HOSPITALS[curHospital].folder;
+  document.getElementById('drive-date-part').textContent = getDate() || '—';
+}
+
+// ── Type selection ─────────────────────────────────────────────────────────
+function selectType(id) {
+  curType = id;
+  Object.keys(PTYPES).forEach(k => {
+    const btn = document.getElementById('tbtn-'+k);
+    const t = PTYPES[k];
+    if (k === id) {
+      btn.style.background = t.color;
+      btn.style.color = '#0d1117';
+      btn.style.borderColor = t.color;
+    } else {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  });
+}
+
+// ── Views ──────────────────────────────────────────────────────────────────
+function setView(v) {
+  ['session','dashboard','pending'].forEach(id => {
+    document.getElementById('view-'+id).style.display = id===v ? '' : 'none';
+    document.getElementById('nav-'+id).classList.toggle('active', id===v);
+  });
+  if (v==='dashboard') renderDashboard();
+  if (v==='pending')   renderPending();
+  if (v==='session')   renderSession();
+}
+
+// ── Camera ─────────────────────────────────────────────────────────────────
+async function openCamera() {
+  setCamError('');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } },
+      audio: false
+    });
+    camStream = stream;
+    const vid = document.getElementById('cam-video');
+    vid.srcObject = stream;
+    vid.play();
+    document.getElementById('cam-wrap').classList.add('open');
+    document.getElementById('btn-open-cam').style.display = 'none';
+  } catch(e) {
+    setCamError('Camera access denied. Please allow camera access when prompted, or check your browser settings.');
+  }
+}
+function closeCamera() {
+  if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream = null; }
+  document.getElementById('cam-wrap').classList.remove('open');
+  document.getElementById('btn-open-cam').style.display = '';
+}
+function setCamError(msg) {
+  const el = document.getElementById('cam-error');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+async function captureAndScan() {
+  const vid = document.getElementById('cam-video');
+  const canvas = document.createElement('canvas');
+  canvas.width  = vid.videoWidth  || 1280;
+  canvas.height = vid.videoHeight || 720;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+  const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  closeCamera();
+
+  const scanMsg = document.getElementById('scanning-msg');
+  scanMsg.style.display = 'block';
+  document.getElementById('btn-open-cam').style.display = 'none';
+
+  try {
+    const key = getApiKey();
+    if (!key) throw new Error('No API key set. Enter your Anthropic API key above.');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: `Analyse this Australian hospital patient front sheet or label sticker.
+Return ONLY valid JSON, no markdown, no explanation:
+{
+  "patientName": "SURNAME, Firstname",
+  "urNumber": "digits only or null",
+  "dob": "DD/MM/YYYY or null",
+  "patientType": "public | private | workcover | unknown",
+  "procedure": "brief description or null"
+}
+Hints: Medicare card visible = public; private health fund number = private; claim number = workcover. Use null for any field not clearly visible.` }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = (data.content||[]).find(b=>b.type==='text')?.text || '{}';
+    const ex = JSON.parse(text.replace(/```json|```/g,'').trim());
+    document.getElementById('f-name').value = ex.patientName || '';
+    document.getElementById('f-ur').value   = ex.urNumber    || '';
+    document.getElementById('f-dob').value  = ex.dob         || '';
+    if (['public','private','workcover'].includes(ex.patientType)) selectType(ex.patientType);
+    document.getElementById('f-proc').value = ex.procedure   || '';
+  } catch(e) {
+    setCamError('Scan failed: ' + e.message);
+  }
+  scanMsg.style.display = 'none';
+  document.getElementById('btn-open-cam').style.display = '';
+}
+
+// ── Add patient ────────────────────────────────────────────────────────────
+function addPatient() {
+  const name = document.getElementById('f-name').value.trim();
+  const ur   = document.getElementById('f-ur').value.trim();
+  if (!name && !ur) { alert('Enter at least a name or UR number.'); return; }
+  const key  = `${curHospital}::${getDate()}::${ur || 'm'+Date.now()}`;
+  const pt   = PTYPES[curType];
+  db[key] = {
+    name, ur, dob: document.getElementById('f-dob').value.trim(),
+    type: curType, billingSystem: pt.system,
+    procedure: document.getElementById('f-proc').value.trim(),
+    hospital: curHospital, date: getDate(),
+    addedAt: Date.now(), tasks: {}, taskTs: {}
+  };
+  saveDB();
+  // Clear form
+  ['f-name','f-ur','f-dob','f-proc'].forEach(id => document.getElementById(id).value = '');
+  selectType('public');
+  renderAll();
+}
+
+// ── Toggle task ────────────────────────────────────────────────────────────
+function toggleTask(key, taskId) {
+  const p = db[key];
+  if (!p) return;
+  const was = !!p.tasks[taskId];
+  p.tasks[taskId]  = !was;
+  p.taskTs[taskId] = !was ? Date.now() : null;
+  saveDB();
+  renderAll();
+}
+
+// ── Delete patient ─────────────────────────────────────────────────────────
+function deletePatient(key) {
+  if (!confirm('Remove this patient?')) return;
+  delete db[key];
+  saveDB();
+  renderAll();
+}
+
+// ── Drive sync ─────────────────────────────────────────────────────────────
+async function syncDrive() {
+  const el = document.getElementById('sync-result');
+  const btn = document.getElementById('btn-sync');
+  btn.textContent = '⏳ Syncing…';
+  btn.disabled = true;
+  el.style.display = 'none';
+
+  const key = getApiKey();
+  if (!key) {
+    showSyncResult(false, 'Enter your Anthropic API key above to use Drive sync.');
+    btn.textContent = '↓ Sync Drive'; btn.disabled = false; return;
+  }
+
+  const folderName = HOSPITALS[curHospital].folder;
+  const dateStr    = getDate();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 2000,
+        mcp_servers: [{ type: 'url', url: 'https://gdrive.mcp.anthropic.com/mcp', name: 'gdrive' }],
+        messages: [{ role: 'user', content:
+          `Search my Google Drive for folder "${folderName}", then inside it find subfolder "${dateStr}", then list all files. Return ONLY JSON: {"folderFound":bool,"subfolderFound":bool,"files":[{"name":"...","webViewLink":"..."}]}` }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No structured response from Drive.');
+    const r = JSON.parse(match[0]);
+    if (!r.folderFound)     showSyncResult(false, `Folder "${folderName}" not found in Drive.`);
+    else if (!r.subfolderFound) showSyncResult(false, `No subfolder "${dateStr}" in "${folderName}".`);
+    else if (!r.files?.length)  showSyncResult(true,  'Folder found but empty.', []);
+    else showSyncResult(true, `${r.files.length} file(s) found:`, r.files);
+  } catch(e) {
+    showSyncResult(false, e.message);
+  }
+  btn.textContent = '↓ Sync Drive'; btn.disabled = false;
+}
+
+function showSyncResult(ok, msg, files) {
+  const el = document.getElementById('sync-result');
+  el.className = ok ? 'ok' : 'err';
+  let html = `<strong>${ok?'✓':'✕'}</strong> ${esc(msg)}`;
+  if (files && files.length) {
+    html += '<br>';
+    files.forEach(f => {
+      html += `<a href="${esc(f.webViewLink)}" target="_blank" style="color:#58a6ff;text-decoration:none;display:block;margin-top:4px">📄 ${esc(f.name)}</a>`;
+    });
+  }
+  if (!ok) html += `<div style="margin-top:6px;font-size:11px;color:#666">Make sure Google Drive is connected in Claude Settings → Integrations</div>`;
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+// ── Render patient card HTML ───────────────────────────────────────────────
+function patientCardHTML(key, p, showDelete=true) {
+  const h   = HOSPITALS[p.hospital];
+  const pt  = PTYPES[p.type];
+  const age = staleness(p.addedAt);
+  const pending = TASKS.filter(t => !p.tasks[t.id]).length;
+  const ageClass = age==='red' ? 'age-red' : age==='amber' ? 'age-amber' : '';
+
+  let tags = '';
+  if (h)  tags += chip(h.color+'22',  h.color,  `${h.label} · ${h.billing}`);
+  if (pt) tags += chip(pt.color+'22', pt.color, `${pt.label} → ${pt.system}`);
+  if (age==='red')   tags += chip('#e6394622','#e63946','🔴 Overdue');
+  if (age==='amber') tags += chip('#f4a26122','#f4a261','🟡 Due soon');
+
+  let taskRows = '';
+  TASKS.forEach(task => {
+    const done = !!p.tasks[task.id];
+    taskRows += `
+      <div class="task-row" onclick="toggleTask(${JSON.stringify(key)}, '${task.id}')">
+        <div class="checkbox ${done?'done'}">${done?'✓':''}</div>
+        <span class="task-label ${done?'done'}">${esc(task.label)}</span>
+      </div>`;
+  });
+
+  const delBtn = showDelete ? `<button class="pc-del" onclick="deletePatient(${JSON.stringify(key)})">✕</button>` : '';
+
+  return `
+    <div class="patient-card ${ageClass}">
+      <div class="pc-header">
+        <div>
+          <div class="pc-name">${esc(p.name||'Unnamed')}</div>
+          <div class="pc-meta">UR ${esc(p.ur||'—')} · ${esc(p.dob||'—')} · ${displayDate(p.date)}</div>
+        </div>
+        ${delBtn}
+      </div>
+      <div class="pc-tags">${tags}</div>
+      ${p.procedure ? `<div class="pc-proc">${esc(p.procedure)}</div>` : ''}
+      ${taskRows}
+      <div class="pc-footer ${pending===0?'all-done':''}">
+        ${pending===0 ? '✅ All tasks done' : `${pending} task${pending!==1?'s':''} pending`}
+      </div>
+    </div>`;
+}
+
+// ── Render session ─────────────────────────────────────────────────────────
+function renderSession() {
+  const date = getDate();
+  const keys = Object.keys(db).filter(k => k.startsWith(`${curHospital}::${date}::`));
+  const el = document.getElementById('session-list');
+  const meta = document.getElementById('session-meta');
+  if (keys.length === 0) {
+    meta.textContent = '';
+    el.innerHTML = `<div class="empty">No patients yet for ${HOSPITALS[curHospital].label} on ${displayDate(date)}.</div>`;
+    return;
+  }
+  meta.textContent = `${HOSPITALS[curHospital].label} · ${displayDate(date)} · ${keys.length} patient${keys.length!==1?'s':''}`;
+  el.innerHTML = keys.map(k => patientCardHTML(k, db[k])).join('');
+  updateStats();
+}
+
+// ── Render dashboard ───────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  curFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDashboard();
+}
+function renderDashboard() {
+  const entries = Object.entries(db).sort(([,a],[,b]) => b.addedAt - a.addedAt);
+  const filtered = entries.filter(([,p]) => {
+    const pend = TASKS.filter(t => !p.tasks[t.id]).length;
+    const age  = staleness(p.addedAt);
+    if (curFilter==='pending') return pend > 0;
+    if (curFilter==='done')    return pend === 0;
+    if (curFilter==='red')     return age === 'red';
+    if (curFilter==='amber')   return age === 'amber';
+    return true;
+  });
+  const el = document.getElementById('dashboard-list');
+  if (filtered.length === 0) {
+    el.innerHTML = '<div class="empty">No patients match this filter.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(([k,p]) => patientCardHTML(k, p)).join('');
+  updateStats();
+}
+
+// ── Render pending ─────────────────────────────────────────────────────────
+function renderPending() {
+  const allPending = [];
+  Object.entries(db).forEach(([k,p]) => {
+    TASKS.forEach(task => {
+      if (!p.tasks[task.id]) allPending.push({ key:k, patient:p, task });
+    });
+  });
+  allPending.sort((a,b) => a.patient.addedAt - b.patient.addedAt);
+
+  const el = document.getElementById('pending-list');
+  if (allPending.length === 0) {
+    el.innerHTML = '<div class="empty">🎉 All tasks complete!</div>';
+    updateStats();
+    return;
+  }
+
+  el.innerHTML = allPending.map(item => {
+    const age = staleness(item.patient.addedAt);
+    const h   = HOSPITALS[item.patient.hospital];
+    const pt  = PTYPES[item.patient.type];
+    const ageClass = age==='red' ? 'age-red' : age==='amber' ? 'age-amber' : '';
+    let ageLbl = '';
+    if (age==='red')   ageLbl = `<div class="age-label" style="color:#e63946">🔴 Overdue &gt;2wk</div>`;
+    if (age==='amber') ageLbl = `<div class="age-label" style="color:#f4a261">🟡 Due soon &gt;1wk</div>`;
+    let tags = '';
+    if (h)  tags += chip(h.color+'33', h.color, h.label);
+    if (pt) tags += chip(pt.color+'33', pt.color, pt.system);
+    return `
+      <div class="pend-row ${ageClass}">
+        <div>
+          <div class="pend-name">${esc(item.patient.name||'Unnamed')}</div>
+          <div class="pend-meta">
+            ${tags}
+            <span style="font-size:11px;color:#555">${displayDate(item.patient.date)}</span>
+            ${item.patient.procedure ? `<span style="font-size:11px;color:#555;font-style:italic">${esc(item.patient.procedure)}</span>` : ''}
+          </div>
+        </div>
+        <div class="pend-right">
+          <div class="pend-task">${esc(item.task.label)}</div>
+          ${ageLbl}
+          <button class="btn-done" onclick="toggleTask(${JSON.stringify(item.key)}, '${item.task.id}')">Mark done ✓</button>
+        </div>
+      </div>`;
+  }).join('');
+  updateStats();
+}
+
+// ── Update header stats ────────────────────────────────────────────────────
+function updateStats() {
+  const allPending = [];
+  Object.values(db).forEach(p => {
+    TASKS.forEach(t => { if (!p.tasks[t.id]) allPending.push({ patient:p, taskId:t.id }); });
+  });
+  document.getElementById('stat-patients').textContent = Object.keys(db).length;
+  document.getElementById('stat-pending').textContent  = allPending.length;
+  document.getElementById('stat-overdue').textContent  = allPending.filter(x => staleness(x.patient.addedAt)==='red').length;
+  // Update pending nav label
+  document.getElementById('nav-pending').textContent = `⏳ Pending${allPending.length ? ` (${allPending.length})` : ''}`;
+}
+
+function renderAll() {
+  renderSession();
+  updateStats();
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+initDate();
+selectHospital('fairfield');
+selectType('public');
+initApiBanner();
+renderAll();
+</script>
+</body>
+</html>
