@@ -447,12 +447,21 @@ function setCamError(msg) {
 // ── Capture pipeline ──────────────────────────────────────────────────────────
 async function captureFrame() {
   const vid = document.getElementById('cam-video');
-  const canvas = document.createElement('canvas');
-  canvas.width  = vid.videoWidth  || 1280;
-  canvas.height = vid.videoHeight || 720;
-  canvas.getContext('2d').drawImage(vid, 0, 0);
 
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  // Resize to max 1280px wide — full camera resolution creates a 400–800KB payload
+  // that fails over weak mobile signals. 1280px is still plenty for reading sticker text.
+  const MAX_W = 1280;
+  let srcW = vid.videoWidth  || 1280;
+  let srcH = vid.videoHeight || 720;
+  let dstW = srcW, dstH = srcH;
+  if (srcW > MAX_W) { dstW = MAX_W; dstH = Math.round(srcH * MAX_W / srcW); }
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = dstW;
+  canvas.height = dstH;
+  canvas.getContext('2d').drawImage(vid, 0, 0, dstW, dstH);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
   const base64  = dataUrl.split(',')[1];
 
   closeCamera();
@@ -468,7 +477,10 @@ async function captureFrame() {
     currentScan = { ...extracted, timestamp, thumbBase64: base64 };
     showReviewForm(extracted);
   } catch (e) {
-    setCamError('Scan failed: ' + e.message);
+    const msg = e.message.toLowerCase().includes('fetch')
+      ? 'Network error — check your internet connection and try again. If the problem persists, your API key may be invalid.'
+      : 'Scan failed: ' + e.message;
+    setCamError(msg);
     document.getElementById('btn-open-cam').style.display = '';
   }
 
