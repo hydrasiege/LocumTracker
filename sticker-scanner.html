@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sticker Scanner">
+<meta name="theme-color" content="#0d1117">
+<title>Sticker Scanner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --border2: #21262d;
+    --text: #e6edf3; --text2: #8b949e; --text3: #7d8590;
+    --teal: #2ec4b6; --blue: #58a6ff; --amber: #f4a261; --red: #e63946;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro Display', 'Segoe UI', sans-serif; }
+  body { overflow-x: hidden; }
+
+  /* Header */
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center;
+    padding: 14px 16px; background: rgba(22,27,34,0.95);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--border2);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon { font-size: 22px; }
+  .brand-title { font-size: 15px; font-weight: 700; letter-spacing: 0.07em; }
+  .brand-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+
+  /* Main */
+  #main { padding: 16px 16px 120px; max-width: 700px; margin: 0 auto; }
+
+  /* Section title */
+  .section-title { font-size: 17px; font-weight: 700; margin-bottom: 12px; letter-spacing: 0.02em; }
+
+  /* Cards */
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+  /* Fields */
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+  input[type=text], input[type=password] {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text); font-size: 15px; outline: none; width: 100%;
+    -webkit-appearance: none;
+  }
+  input[type=text]::placeholder, input[type=password]::placeholder { color: var(--text3); }
+
+  /* Camera */
+  #cam-wrap { margin-bottom: 14px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); display: none; }
+  #cam-wrap.open { display: block; }
+  #cam-video { width: 100%; display: block; max-height: 300px; object-fit: cover; background: #000; }
+  .cam-btns { display: flex; gap: 8px; padding: 10px; background: var(--bg2); }
+  #btn-capture {
+    flex: 1; padding: 12px; border-radius: 8px; border: none;
+    background: var(--teal); color: #0d1117; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  #btn-cam-cancel {
+    padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2); font-size: 13px; cursor: pointer;
+  }
+  #btn-open-cam {
+    width: 100%; padding: 14px; border-radius: 10px; border: 1px solid rgba(46,196,182,0.25);
+    background: rgba(46,196,182,0.08); color: var(--teal); font-size: 15px; font-weight: 700;
+    cursor: pointer; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #scanning-msg {
+    padding: 10px 14px; border-radius: 8px; background: #0d2a1a;
+    border: 1px solid rgba(46,196,182,0.2); color: var(--teal);
+    font-size: 13px; margin-bottom: 14px; display: none;
+  }
+  #cam-error {
+    padding: 10px 14px; border-radius: 8px; background: #1a0e0e;
+    border: 1px solid rgba(230,57,70,0.3); color: #e07070;
+    font-size: 13px; margin-bottom: 12px; display: none;
+  }
+
+  /* Review card */
+  #review-card { display: none; }
+  #review-thumb { width: 100%; border-radius: 8px; margin-bottom: 14px; display: none; }
+  .row2 { display: flex; gap: 10px; }
+  .row2 .field { flex: 1; }
+  #submit-error {
+    padding: 10px 14px; border-radius: 8px; background: #1a0e0e;
+    border: 1px solid rgba(230,57,70,0.3); color: #e07070;
+    font-size: 13px; margin-bottom: 10px; display: none; line-height: 1.5;
+  }
+  .review-actions { display: flex; gap: 8px; margin-top: 4px; }
+  #btn-submit {
+    flex: 1; padding: 12px; border-radius: 8px; border: none;
+    background: var(--teal); color: #0d1117; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  #btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  #btn-discard {
+    padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2); font-size: 13px; cursor: pointer;
+  }
+
+  /* History */
+  .hist-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; border-radius: 10px;
+    background: var(--bg2); border: 1px solid var(--border);
+    margin-bottom: 6px; gap: 10px;
+  }
+  .hist-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .hist-mrn { font-size: 13px; font-weight: 700; color: var(--teal); flex-shrink: 0; }
+  .hist-name { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+  .hist-dob  { font-size: 11px; color: var(--text3); }
+  .hist-item { font-size: 11px; color: var(--blue); }
+  .hist-time { font-size: 10px; color: #555; }
+
+  /* Empty state */
+  .empty { text-align: center; color: #444; font-size: 14px; padding: 36px 0; }
+
+  /* Setup panel */
+  #setup-panel { margin-bottom: 12px; }
+  #setup-panel summary {
+    cursor: pointer; list-style: none; display: flex;
+    justify-content: space-between; align-items: center;
+    font-size: 14px; font-weight: 600;
+    /* override default marker */
+    -webkit-user-select: none; user-select: none;
+  }
+  #setup-panel summary::-webkit-details-marker { display: none; }
+  #setup-status-dot { font-size: 12px; font-weight: 500; }
+  .setup-body { margin-top: 14px; }
+  .setup-divider { border: none; border-top: 1px solid var(--border2); margin: 16px 0; }
+  .setup-guide-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 10px; }
+  .setup-steps { font-size: 12px; color: var(--text3); line-height: 2; padding-left: 18px; }
+  .setup-steps a { color: var(--blue); text-decoration: none; }
+  .setup-steps code {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px;
+    padding: 1px 5px; font-family: monospace; font-size: 11px; color: var(--text2);
+  }
+  .script-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .script-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+  #btn-copy-script {
+    padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2); font-size: 11px; cursor: pointer;
+  }
+  #apps-script-block {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; font-size: 11px; color: var(--text2); overflow-x: auto;
+    white-space: pre; font-family: 'SF Mono', 'Fira Code', monospace; line-height: 1.6;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 500;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+  #toast.ok  { background: #0d2a1a; border-color: rgba(46,196,182,0.3); color: var(--teal); }
+  #toast.err { background: #1a0e0e; border-color: rgba(230,57,70,0.3); color: #e07070; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="brand">
+    <span class="brand-icon">🏷️</span>
+    <div>
+      <div class="brand-title">STICKER SCANNER</div>
+      <div class="brand-sub">Patient label → Google Sheet</div>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+
+  <!-- Setup panel -->
+  <details id="setup-panel" class="card">
+    <summary>
+      <span>⚙️ Setup</span>
+      <span id="setup-status-dot"></span>
+    </summary>
+    <div class="setup-body">
+      <div class="field">
+        <label>Anthropic API Key</label>
+        <input type="password" id="input-apikey" placeholder="sk-ant-..." oninput="saveSettings()" autocomplete="off" />
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Google Apps Script URL</label>
+        <input type="text" id="input-sheets-url" placeholder="https://script.google.com/macros/s/.../exec" oninput="saveSettings()" autocomplete="off" />
+      </div>
+
+      <hr class="setup-divider">
+
+      <div class="setup-guide-title">How to connect Google Sheets (one-time setup)</div>
+      <ol class="setup-steps">
+        <li>Open <a href="https://sheets.google.com" target="_blank">Google Sheets</a> and create a new spreadsheet</li>
+        <li>In row 1, add headers: <code>Timestamp</code> <code>MRN</code> <code>Patient Name</code> <code>DOB</code> <code>Item Number</code> <code>Notes</code></li>
+        <li>Click <strong>Extensions → Apps Script</strong></li>
+        <li>Delete any existing code, then paste the script below</li>
+        <li>Click <strong>Deploy → New deployment</strong></li>
+        <li>Type: <em>Web app</em> · Execute as: <em>Me</em> · Who has access: <em>Anyone</em></li>
+        <li>Click <strong>Deploy</strong> and authorise when prompted</li>
+        <li>Copy the web app URL and paste it into the field above</li>
+      </ol>
+      <p style="font-size:11px; color:#555; margin-top:10px; line-height:1.6">
+        ⚠️ Keep the Apps Script URL private — anyone with the URL can add rows to your sheet.
+      </p>
+
+      <div class="script-header" style="margin-top:14px">
+        <span class="script-label">Apps Script — paste into script editor</span>
+        <button id="btn-copy-script" onclick="copyScript()">Copy</button>
+      </div>
+      <pre id="apps-script-block"></pre>
+    </div>
+  </details>
+
+  <!-- Camera section -->
+  <div id="cam-error"></div>
+  <div id="scanning-msg">⏳ Reading sticker with AI…</div>
+
+  <div id="cam-wrap">
+    <video id="cam-video" autoplay playsinline muted></video>
+    <div class="cam-btns">
+      <button id="btn-capture" onclick="captureFrame()">📸 Capture Sticker</button>
+      <button id="btn-cam-cancel" onclick="closeCamera()">Cancel</button>
+    </div>
+  </div>
+
+  <button id="btn-open-cam" onclick="openCamera()">📷 Scan Patient Sticker</button>
+
+  <!-- Review card -->
+  <div id="review-card" class="card">
+    <div class="card-title">Review Extracted Data</div>
+    <img id="review-thumb" alt="Captured sticker" />
+    <div class="row2">
+      <div class="field">
+        <label>MRN</label>
+        <input type="text" id="r-mrn" placeholder="1234567" />
+      </div>
+      <div class="field">
+        <label>DOB</label>
+        <input type="text" id="r-dob" placeholder="DD/MM/YYYY" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Patient Name</label>
+      <input type="text" id="r-name" placeholder="SURNAME, Firstname" />
+    </div>
+    <div class="field">
+      <label>Item Number</label>
+      <input type="text" id="r-item" placeholder="e.g. 48900" />
+    </div>
+    <div class="field" style="margin-bottom:8px">
+      <label>Notes</label>
+      <input type="text" id="r-notes" placeholder="Optional notes" />
+    </div>
+    <div id="submit-error"></div>
+    <div class="review-actions">
+      <button id="btn-submit" onclick="submitRow()">✓ Submit to Sheet</button>
+      <button id="btn-discard" onclick="discardReview()">Discard</button>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="section-title" style="margin-top:8px">Recent Scans</div>
+  <div id="history-list"></div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const APIKEY_KEY   = 'locum_apikey';
+const SHEETS_KEY   = 'locum_sheets_url';
+const HISTORY_KEY  = 'locum_sticker_history';
+const HISTORY_MAX  = 20;
+
+const STICKER_PROMPT = `You are reading an Australian hospital patient identification sticker or label.
+These labels appear in several formats:
+- MRN/UR label: small adhesive showing Medical Record Number, patient name, DOB
+- Barcode sticker: 1D or 2D barcode with patient ID printed below or beside it
+- Hospital ID sticker: patient name prominently displayed, with UR/MRN and date of birth
+- Addressograph plate label: older format, all-caps, embossed or printed text
+
+Extract exactly three fields and return ONLY valid JSON with no markdown and no explanation:
+{
+  "mrn": "the medical record number as a string (typically 6-8 digits), or null if not found",
+  "name": "patient name in SURNAME, Firstname format, or null if not found",
+  "dob": "date of birth in DD/MM/YYYY format, or null if not found"
+}
+
+Rules:
+- MRN may be labelled UR, MRN, Medical Record No, Unit Record, or Hospital No — it is typically 6-8 digits
+- DOB may be labelled DOB, Date of Birth, or D.O.B — convert any date format to DD/MM/YYYY
+- Name is usually printed SURNAME, Firstname or SURNAME Firstname — preserve surname-first order with a comma
+- If a barcode number appears and no other patient ID is visible, use it as the mrn value
+- Use null for any field that is not clearly legible in the image
+- Do NOT guess or invent values — accuracy is critical in a medical context`;
+
+const APPS_SCRIPT_CODE = `function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+    // Parse the JSON body sent by the sticker scanner
+    var data = JSON.parse(e.postData.contents);
+
+    // Format timestamp to local time (uses your Google account timezone)
+    var ts = new Date(data.timestamp);
+    var tsFormatted = Utilities.formatDate(
+      ts, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss'
+    );
+
+    // Append one row: Timestamp | MRN | Patient Name | DOB | Item Number | Notes
+    sheet.appendRow([
+      tsFormatted,
+      data.mrn        || '',
+      data.name       || '',
+      data.dob        || '',
+      data.itemNumber || '',
+      data.notes      || ''
+    ]);
+
+    return ContentService
+      .createTextOutput('OK')
+      .setMimeType(ContentService.MimeType.TEXT);
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput('ERROR: ' + err.toString())
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+}`;
+
+// ── State ────────────────────────────────────────────────────────────────────
+let camStream   = null;
+let currentScan = null;
+let submitting  = false;
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+function loadSettings() {
+  const key = localStorage.getItem(APIKEY_KEY) || '';
+  const url = localStorage.getItem(SHEETS_KEY) || '';
+  document.getElementById('input-apikey').value     = key;
+  document.getElementById('input-sheets-url').value = url;
+  updateSetupStatus(key, url);
+  if (!key || !url) document.getElementById('setup-panel').open = true;
+}
+
+function saveSettings() {
+  const key = document.getElementById('input-apikey').value.trim();
+  const url = document.getElementById('input-sheets-url').value.trim();
+  localStorage.setItem(APIKEY_KEY,  key);
+  localStorage.setItem(SHEETS_KEY,  url);
+  updateSetupStatus(key, url);
+}
+
+function updateSetupStatus(key, url) {
+  const dot = document.getElementById('setup-status-dot');
+  if (key && url) {
+    dot.textContent = '✅ Ready';
+    dot.style.color = 'var(--teal)';
+  } else if (!key && !url) {
+    dot.textContent = '⚠️ Setup required';
+    dot.style.color = 'var(--amber)';
+  } else if (!key) {
+    dot.textContent = '⚠️ API key needed';
+    dot.style.color = 'var(--amber)';
+  } else {
+    dot.textContent = '⚠️ Sheets URL needed';
+    dot.style.color = 'var(--amber)';
+  }
+}
+
+// ── Camera ───────────────────────────────────────────────────────────────────
+async function openCamera() {
+  setCamError('');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } },
+      audio: false
+    });
+    camStream = stream;
+    const vid = document.getElementById('cam-video');
+    vid.srcObject = stream;
+    vid.play();
+    document.getElementById('cam-wrap').classList.add('open');
+    document.getElementById('btn-open-cam').style.display = 'none';
+  } catch (e) {
+    setCamError('Camera access denied. Please allow camera access when prompted, or check your browser settings.');
+  }
+}
+
+function closeCamera() {
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  document.getElementById('cam-wrap').classList.remove('open');
+  document.getElementById('btn-open-cam').style.display = '';
+}
+
+function setCamError(msg) {
+  const el = document.getElementById('cam-error');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+// ── Capture pipeline ──────────────────────────────────────────────────────────
+async function captureFrame() {
+  const vid = document.getElementById('cam-video');
+  const canvas = document.createElement('canvas');
+  canvas.width  = vid.videoWidth  || 1280;
+  canvas.height = vid.videoHeight || 720;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  const base64  = dataUrl.split(',')[1];
+
+  closeCamera();
+  setCamError('');
+
+  const timestamp = new Date().toISOString();
+
+  document.getElementById('scanning-msg').style.display = 'block';
+  document.getElementById('btn-open-cam').style.display = 'none';
+
+  try {
+    const extracted = await analyzeSticker(base64);
+    currentScan = { ...extracted, timestamp, thumbBase64: base64 };
+    showReviewForm(extracted);
+  } catch (e) {
+    setCamError('Scan failed: ' + e.message);
+    document.getElementById('btn-open-cam').style.display = '';
+  }
+
+  document.getElementById('scanning-msg').style.display = 'none';
+}
+
+// ── Claude API ────────────────────────────────────────────────────────────────
+async function analyzeSticker(base64) {
+  const key = localStorage.getItem(APIKEY_KEY) || '';
+  if (!key) throw new Error('No API key set. Open ⚙️ Setup above and enter your Anthropic key.');
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+          { type: 'text',  text: STICKER_PROMPT }
+        ]
+      }]
+    })
+  });
+
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+
+  const text = (data.content || []).find(b => b.type === 'text')?.text || '{}';
+  try {
+    return JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch {
+    throw new Error('Could not read sticker. Try again with better lighting or a closer angle.');
+  }
+}
+
+// ── Review form ───────────────────────────────────────────────────────────────
+function showReviewForm(data) {
+  document.getElementById('r-mrn').value   = data.mrn   || '';
+  document.getElementById('r-dob').value   = data.dob   || '';
+  document.getElementById('r-name').value  = data.name  || '';
+  document.getElementById('r-item').value  = '';
+  document.getElementById('r-notes').value = '';
+  setSubmitError('');
+
+  const thumb = document.getElementById('review-thumb');
+  if (currentScan && currentScan.thumbBase64) {
+    thumb.src = 'data:image/jpeg;base64,' + currentScan.thumbBase64;
+    thumb.style.display = 'block';
+  } else {
+    thumb.style.display = 'none';
+  }
+
+  document.getElementById('review-card').style.display = '';
+  document.getElementById('btn-open-cam').style.display = 'none';
+  document.getElementById('review-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function discardReview() {
+  document.getElementById('review-card').style.display = 'none';
+  document.getElementById('btn-open-cam').style.display = '';
+  currentScan = null;
+  setCamError('');
+}
+
+function setSubmitError(msg) {
+  const el = document.getElementById('submit-error');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function submitRow() {
+  if (submitting) return;
+  submitting = true;
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '⏳ Submitting…';
+  setSubmitError('');
+
+  const mrn = document.getElementById('r-mrn').value.trim();
+  if (!mrn) {
+    setSubmitError('MRN is required. Edit the field above, or tap Discard to start over.');
+    btn.disabled = false;
+    btn.textContent = '✓ Submit to Sheet';
+    submitting = false;
+    return;
+  }
+
+  const rowData = {
+    timestamp:  currentScan.timestamp,
+    mrn,
+    name:       document.getElementById('r-name').value.trim(),
+    dob:        document.getElementById('r-dob').value.trim(),
+    itemNumber: document.getElementById('r-item').value.trim(),
+    notes:      document.getElementById('r-notes').value.trim()
+  };
+
+  try {
+    await submitToSheets(rowData);
+    addToHistory(rowData);
+    renderHistory();
+    document.getElementById('review-card').style.display = 'none';
+    document.getElementById('btn-open-cam').style.display = '';
+    currentScan = null;
+    showToast('Submitted ✓', 'ok');
+  } catch (e) {
+    setSubmitError(e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✓ Submit to Sheet';
+  submitting = false;
+}
+
+// ── Google Sheets (Apps Script POST) ─────────────────────────────────────────
+async function submitToSheets(rowData) {
+  const url = localStorage.getItem(SHEETS_KEY) || '';
+  if (!url) throw new Error('No Apps Script URL. Open ⚙️ Setup above and paste your deployment URL.');
+
+  const res = await fetch(url, {
+    method: 'POST',
+    // text/plain avoids a CORS preflight OPTIONS request that Apps Script cannot handle
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(rowData)
+  });
+
+  if (!res.ok) throw new Error('Sheet returned HTTP ' + res.status + '. Check your Apps Script deployment.');
+
+  const text = await res.text();
+  if (text.startsWith('ERROR:')) throw new Error('Apps Script error: ' + text.slice(7, 200));
+  if (!text.includes('OK'))      throw new Error('Unexpected response from sheet: ' + text.slice(0, 100));
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+
+function addToHistory(rowData) {
+  let hist = loadHistory();
+  hist.unshift(rowData);
+  if (hist.length > HISTORY_MAX) hist = hist.slice(0, HISTORY_MAX);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+}
+
+function renderHistory() {
+  const hist = loadHistory();
+  const el = document.getElementById('history-list');
+  if (hist.length === 0) {
+    el.innerHTML = '<div class="empty">No scans yet.</div>';
+    return;
+  }
+  el.innerHTML = hist.map(r => {
+    const d = new Date(r.timestamp);
+    const dateStr = d.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    const timeStr = d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `<div class="hist-row">
+      <div class="hist-left">
+        <span class="hist-mrn">${esc(r.mrn || '—')}</span>
+        <span class="hist-name">${esc(r.name || '—')}</span>
+      </div>
+      <div class="hist-right">
+        <span class="hist-dob">${esc(r.dob || '—')}</span>
+        ${r.itemNumber ? `<span class="hist-item">${esc(r.itemNumber)}</span>` : ''}
+        <span class="hist-time">${dateStr} ${timeStr}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, 2800);
+}
+
+// ── Clipboard ─────────────────────────────────────────────────────────────────
+function copyScript() {
+  navigator.clipboard.writeText(APPS_SCRIPT_CODE)
+    .then(() => showToast('Copied ✓', 'ok'))
+    .catch(() => showToast('Copy failed — select and copy manually', 'err'));
+}
+
+// ── XSS helper ────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+document.getElementById('apps-script-block').textContent = APPS_SCRIPT_CODE;
+loadSettings();
+renderHistory();
+</script>
+</body>
+</html>
