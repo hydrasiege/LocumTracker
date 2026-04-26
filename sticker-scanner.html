@@ -168,9 +168,34 @@
   #toast.show { opacity: 1; }
   #toast.ok  { background: #0d2a1a; border-color: rgba(46,196,182,0.3); color: var(--teal); }
   #toast.err { background: #1a0e0e; border-color: rgba(230,57,70,0.3); color: #e07070; }
+  /* Save button */
+  #btn-save-settings {
+    width: 100%; padding: 11px; border-radius: 8px; border: none;
+    background: var(--teal); color: #0d1117; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 10px;
+  }
+
+  /* JS error banner */
+  #js-error-banner {
+    background: #1a0e0e; border: 1px solid rgba(230,57,70,0.4); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #e07070;
+    line-height: 1.5; display: none;
+  }
 </style>
 </head>
 <body>
+
+<!-- Catch JS errors before anything else runs -->
+<script>
+window.onerror = function(msg, src, line) {
+  var el = document.getElementById('js-error-banner');
+  if (el) {
+    el.textContent = '⚠️ Script error (line ' + line + '): ' + msg + ' — try a hard refresh (hold Reload).';
+    el.style.display = 'block';
+  }
+  return false;
+};
+</script>
 
 <div id="header">
   <div class="brand">
@@ -184,6 +209,8 @@
 
 <div id="main">
 
+  <div id="js-error-banner"></div>
+
   <!-- Setup panel -->
   <details id="setup-panel" class="card">
     <summary>
@@ -193,12 +220,13 @@
     <div class="setup-body">
       <div class="field">
         <label>Anthropic API Key</label>
-        <input type="password" id="input-apikey" placeholder="sk-ant-..." oninput="saveSettings()" autocomplete="off" />
+        <input type="password" id="input-apikey" placeholder="sk-ant-..." autocomplete="off" />
       </div>
-      <div class="field" style="margin-bottom:0">
+      <div class="field">
         <label>Google Apps Script URL</label>
-        <input type="text" id="input-sheets-url" placeholder="https://script.google.com/macros/s/.../exec" oninput="saveSettings()" autocomplete="off" />
+        <input type="text" id="input-sheets-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" />
       </div>
+      <button id="btn-save-settings" onclick="saveSettings()">Save Settings</button>
 
       <hr class="setup-divider">
 
@@ -361,9 +389,11 @@ function loadSettings() {
 function saveSettings() {
   const key = document.getElementById('input-apikey').value.trim();
   const url = document.getElementById('input-sheets-url').value.trim();
-  localStorage.setItem(APIKEY_KEY,  key);
-  localStorage.setItem(SHEETS_KEY,  url);
+  localStorage.setItem(APIKEY_KEY, key);
+  localStorage.setItem(SHEETS_KEY, url);
   updateSetupStatus(key, url);
+  showToast('Settings saved ✓', 'ok');
+  if (key && url) document.getElementById('setup-panel').open = false;
 }
 
 function updateSetupStatus(key, url) {
