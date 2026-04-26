@@ -418,7 +418,7 @@ async function openCamera() {
   setCamError('');
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 800, max: 1000 } },
       audio: false
     });
     camStream = stream;
@@ -450,7 +450,7 @@ async function captureFrame() {
 
   // Resize to max 1280px wide — full camera resolution creates a 400–800KB payload
   // that fails over weak mobile signals. 1280px is still plenty for reading sticker text.
-  const MAX_W = 1280;
+  const MAX_W = 800;
   let srcW = vid.videoWidth  || 1280;
   let srcH = vid.videoHeight || 720;
   let dstW = srcW, dstH = srcH;
@@ -461,7 +461,7 @@ async function captureFrame() {
   canvas.height = dstH;
   canvas.getContext('2d').drawImage(vid, 0, 0, dstW, dstH);
 
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
   const base64  = dataUrl.split(',')[1];
 
   closeCamera();
