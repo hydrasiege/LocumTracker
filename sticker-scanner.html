@@ -233,14 +233,21 @@ window.onerror = function(msg, src, line) {
 
       <hr class="setup-divider">
 
-      <div class="setup-guide-title">Setup / update the Apps Script</div>
+      <div class="setup-guide-title">Apps Script setup (do this every time you update the code)</div>
       <ol class="setup-steps">
         <li>Open your Google Sheet → <strong>Extensions → Apps Script</strong></li>
-        <li>Select all existing code and replace it with the script below</li>
-        <li>Click <strong>Deploy → Manage deployments</strong></li>
-        <li>Click the ✏️ pencil on your existing deployment → set Version to <em>New version</em> → <strong>Deploy</strong> (URL stays the same)</li>
-        <li>If this is your first time: click <strong>Deploy → New deployment</strong> · Type: <em>Web app</em> · Execute as: <em>Me</em> · Who has access: <em>Anyone</em> → copy the URL and paste above</li>
+        <li>Select <strong>all</strong> existing code (Ctrl+A) and delete it</li>
+        <li>Paste the script below → click <strong>Save</strong> (💾 or Ctrl+S)</li>
+        <li>Click <strong>Deploy → New deployment</strong></li>
+        <li>Click the ⚙️ gear next to "Select type" → choose <strong>Web app</strong></li>
+        <li>Execute as: <strong>Me</strong> · Who has access: <strong>Anyone</strong> ← must be "Anyone", not "Anyone with Google account"</li>
+        <li>Click <strong>Deploy</strong> → click through <strong>all</strong> permission screens and authorise</li>
+        <li>Copy the URL — it must end in <code>/exec</code> (not <code>/dev</code>)</li>
+        <li>Paste it into the Apps Script URL field above → tap <strong>Save Settings</strong></li>
       </ol>
+      <p style="font-size:11px; color:var(--amber); margin-top:8px; line-height:1.6">
+        ⚠️ If you get a 405 error: the URL ends in /dev, access is not "Anyone", or you skipped an auth screen — redo steps 4–9.
+      </p>
       <p style="font-size:11px; color:#555; margin-top:10px; line-height:1.6">
         ⚠️ Keep the Apps Script URL private — anyone with the URL can add rows to your sheet.
       </p>
@@ -344,6 +351,11 @@ var PROMPT = 'You are reading an Australian hospital patient identification stic
   + '{"mrn":"6-8 digit MR/UR number as string, or null","name":"SURNAME, Firstname or null","dob":"DD/MM/YYYY or null"}. '
   + 'MRN may be labelled UR, MRN, Medical Record No, or Unit Record. '
   + 'Convert any date format to DD/MM/YYYY. Use null for anything not clearly legible. Do NOT guess.';
+
+// Visit the /exec URL in a browser tab — if you see {"status":"ok"} it is deployed correctly.
+function doGet() {
+  return out('{"status":"ok","msg":"Sticker Scanner script is running"}');
+}
 
 function doPost(e) {
   try {
@@ -546,7 +558,16 @@ async function analyzeSticker(base64) {
     });
     clearTimeout(tid);
 
-    if (!res.ok) throw new Error('Apps Script error HTTP ' + res.status + '. Try redeploying the script.');
+    if (!res.ok) {
+      if (res.status === 405) throw new Error(
+        '405 error — three things to check:\n'
+        + '1. URL must end in /exec (not /dev)\n'
+        + '2. Deployment type must be "Web app"\n'
+        + '3. "Who has access" must be "Anyone"\n'
+        + 'Open ⚙️ Setup → follow the deployment steps again.'
+      );
+      throw new Error('Apps Script HTTP ' + res.status + ' — try redeploying (see ⚙️ Setup).');
+    }
 
     const text = await res.text();
     if (text.startsWith('ERROR:')) {
