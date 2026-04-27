@@ -233,16 +233,13 @@ window.onerror = function(msg, src, line) {
 
       <hr class="setup-divider">
 
-      <div class="setup-guide-title">How to connect Google Sheets (one-time setup)</div>
+      <div class="setup-guide-title">Setup / update the Apps Script</div>
       <ol class="setup-steps">
-        <li>Open <a href="https://sheets.google.com" target="_blank">Google Sheets</a> and create a new spreadsheet</li>
-        <li>In row 1, add headers: <code>Timestamp</code> <code>MRN</code> <code>Patient Name</code> <code>DOB</code> <code>Item Number</code> <code>Notes</code></li>
-        <li>Click <strong>Extensions → Apps Script</strong></li>
-        <li>Delete any existing code, then paste the script below</li>
-        <li>Click <strong>Deploy → New deployment</strong></li>
-        <li>Type: <em>Web app</em> · Execute as: <em>Me</em> · Who has access: <em>Anyone</em></li>
-        <li>Click <strong>Deploy</strong> and authorise when prompted</li>
-        <li>Copy the web app URL and paste it into the field above</li>
+        <li>Open your Google Sheet → <strong>Extensions → Apps Script</strong></li>
+        <li>Select all existing code and replace it with the script below</li>
+        <li>Click <strong>Deploy → Manage deployments</strong></li>
+        <li>Click the ✏️ pencil on your existing deployment → set Version to <em>New version</em> → <strong>Deploy</strong> (URL stays the same)</li>
+        <li>If this is your first time: click <strong>Deploy → New deployment</strong> · Type: <em>Web app</em> · Execute as: <em>Me</em> · Who has access: <em>Anyone</em> → copy the URL and paste above</li>
       </ol>
       <p style="font-size:11px; color:#555; margin-top:10px; line-height:1.6">
         ⚠️ Keep the Apps Script URL private — anyone with the URL can add rows to your sheet.
@@ -340,38 +337,54 @@ Rules:
 - Use null for any field that is not clearly legible in the image
 - Do NOT guess or invent values — accuracy is critical in a medical context`;
 
-const APPS_SCRIPT_CODE = `function doPost(e) {
+const APPS_SCRIPT_CODE = `// Replace ALL existing code with this, then re-deploy (see instructions).
+
+var PROMPT = 'You are reading an Australian hospital patient identification sticker. '
+  + 'Return ONLY valid JSON, no markdown, no explanation: '
+  + '{"mrn":"6-8 digit MR/UR number as string, or null","name":"SURNAME, Firstname or null","dob":"DD/MM/YYYY or null"}. '
+  + 'MRN may be labelled UR, MRN, Medical Record No, or Unit Record. '
+  + 'Convert any date format to DD/MM/YYYY. Use null for anything not clearly legible. Do NOT guess.';
+
+function doPost(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-
-    // Parse the JSON body sent by the sticker scanner
     var data = JSON.parse(e.postData.contents);
-
-    // Format timestamp to local time (uses your Google account timezone)
-    var ts = new Date(data.timestamp);
-    var tsFormatted = Utilities.formatDate(
-      ts, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss'
-    );
-
-    // Append one row: Timestamp | MRN | Patient Name | DOB | Item Number | Notes
-    sheet.appendRow([
-      tsFormatted,
-      data.mrn        || '',
-      data.name       || '',
-      data.dob        || '',
-      data.itemNumber || '',
-      data.notes      || ''
-    ]);
-
-    return ContentService
-      .createTextOutput('OK')
-      .setMimeType(ContentService.MimeType.TEXT);
-
-  } catch (err) {
-    return ContentService
-      .createTextOutput('ERROR: ' + err.toString())
-      .setMimeType(ContentService.MimeType.TEXT);
+    return data.action === 'scan' ? handleScan(data) : handleAppend(data);
+  } catch(err) {
+    return out('ERROR: ' + err.toString());
   }
+}
+
+function handleScan(data) {
+  if (!data.apiKey) return out('ERROR: No API key provided');
+  var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-api-key': data.apiKey, 'anthropic-version': '2023-06-01' },
+    payload: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: data.image } },
+        { type: 'text', text: PROMPT }
+      ]}]
+    }),
+    muteHttpExceptions: true
+  });
+  var result = JSON.parse(resp.getContentText());
+  if (result.error) return out('ERROR: ' + result.error.message);
+  var block = (result.content || []).filter(function(b){ return b.type === 'text'; })[0];
+  return out(block ? block.text : '{"mrn":null,"name":null,"dob":null}');
+}
+
+function handleAppend(data) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var ts = Utilities.formatDate(new Date(data.timestamp), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+  sheet.appendRow([ts, data.mrn||'', data.name||'', data.dob||'', data.itemNumber||'', data.notes||'']);
+  return out('OK');
+}
+
+function out(text) {
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);
 }`;
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -499,9 +512,8 @@ async function captureFrame() {
       // User can read the sticker from the thumbnail and type the values manually.
       currentScan = { mrn: null, name: null, dob: null, timestamp, thumbBase64: base64 };
       showReviewForm({ mrn: null, name: null, dob: null });
-      setCamError('AI scanning blocked — your network may be filtering this service. '
-        + 'Read the sticker from the photo above and enter the details manually. '
-        + 'Tip: turn off Wi-Fi and use mobile data to enable automatic recognition.', true);
+      setCamError('AI scanning failed — the Apps Script may need updating (see ⚙️ Setup). '
+        + 'Read the sticker from the photo above and enter the details manually.', true);
     } else {
       setCamError(e.message);
       document.getElementById('btn-open-cam').style.display = '';
@@ -511,87 +523,49 @@ async function captureFrame() {
   document.getElementById('scanning-msg').style.display = 'none';
 }
 
-// ── Claude API ────────────────────────────────────────────────────────────────
+// ── Claude API (via Apps Script proxy — avoids browser CORS restrictions) ────
 async function analyzeSticker(base64) {
   const key = (localStorage.getItem(APIKEY_KEY) || '').replace(/[^\x21-\x7E]/g, '');
-  if (!key) {
-    throw new Error('No API key saved. Open ⚙️ Setup, enter your key, and tap Save Settings.');
-  }
+  const url = localStorage.getItem(SHEETS_KEY) || '';
+
+  if (!url) throw new Error('No Apps Script URL. Open ⚙️ Setup.');
+  if (!key) throw new Error('No API key. Open ⚙️ Setup and enter your Anthropic key.');
   if (!key.startsWith('sk-ant-')) {
-    throw new Error('API key looks wrong (should start with "sk-ant-"). Re-enter it in ⚙️ Setup.');
+    throw new Error('API key looks wrong — should start with sk-ant-. Re-enter in ⚙️ Setup.');
   }
 
-  const payload = JSON.stringify({
-    model: 'claude-opus-4-5',
-    max_tokens: 300,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-        { type: 'text',  text: STICKER_PROMPT }
-      ]
-    }]
-  });
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), 50000); // 50 s covers Apps Script + Anthropic round trip
 
-  // Attempt up to 2 times — retry once on transient network failure
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const ctrl = new AbortController();
-    const tid  = setTimeout(() => ctrl.abort(), 30000); // 30 s hard timeout
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01'
-        },
-        body: payload
-      });
-      clearTimeout(tid);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'scan', image: base64, apiKey: key })
+    });
+    clearTimeout(tid);
 
-      let data;
-      try { data = await res.json(); }
-      catch { throw new Error('API returned an unreadable response. Try again.'); }
+    if (!res.ok) throw new Error('Apps Script error HTTP ' + res.status + '. Try redeploying the script.');
 
-      if (!res.ok) {
-        if (res.status === 401) throw new Error('API key rejected (401 Unauthorized). Re-enter it in ⚙️ Setup.');
-        if (res.status === 429) throw new Error('Rate limit reached. Wait a moment, then try again.');
-        throw new Error('API error ' + res.status + ': ' + (data?.error?.message || 'unknown'));
+    const text = await res.text();
+    if (text.startsWith('ERROR:')) {
+      const msg = text.slice(7).trim();
+      if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+        throw new Error('API key rejected (401). Re-enter it in ⚙️ Setup.');
       }
-
-      const text = (data.content || []).find(b => b.type === 'text')?.text || '{}';
-      try {
-        return JSON.parse(text.replace(/```json|```/g, '').trim());
-      } catch {
-        throw new Error('Could not read sticker — try better lighting or hold the phone closer.');
-      }
-
-    } catch (e) {
-      clearTimeout(tid);
-
-      if (e.name === 'AbortError') {
-        throw new Error('Request timed out after 30 s. Check your internet connection and try again.');
-      }
-
-      // Only retry on low-level network errors, not on API / logic errors
-      const isNetworkErr = e.message === 'Failed to fetch'
-        || e.message.toLowerCase().includes('networkerror')
-        || e.message.toLowerCase().includes('network request failed');
-
-      if (attempt === 1 && isNetworkErr) {
-        await new Promise(r => setTimeout(r, 1500)); // wait 1.5 s then retry
-        continue;
-      }
-
-      if (isNetworkErr) {
-        throw new Error(
-          'Network error after retry. If you are on hospital Wi-Fi it may block this service — try switching to mobile data.'
-        );
-      }
-
-      throw e; // re-throw API / logic errors unchanged
+      throw new Error(msg);
     }
+
+    try {
+      return JSON.parse(text.replace(/```json|```/g, '').trim());
+    } catch {
+      throw new Error('Could not read sticker — try better lighting or hold closer.');
+    }
+  } catch (e) {
+    clearTimeout(tid);
+    if (e.name === 'AbortError') throw new Error('Request timed out (50 s). Check your connection.');
+    throw e;
   }
 }
 
