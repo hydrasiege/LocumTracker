@@ -80,7 +80,10 @@
   #cam-error {
     padding: 10px 14px; border-radius: 8px; background: #1a0e0e;
     border: 1px solid rgba(230,57,70,0.3); color: #e07070;
-    font-size: 13px; margin-bottom: 12px; display: none;
+    font-size: 13px; margin-bottom: 12px; display: none; line-height: 1.5;
+  }
+  #cam-error.warn {
+    background: #1a1200; border-color: rgba(244,162,97,0.4); color: var(--amber);
   }
 
   /* Review card */
@@ -450,9 +453,10 @@ function closeCamera() {
   document.getElementById('btn-open-cam').style.display = '';
 }
 
-function setCamError(msg) {
+function setCamError(msg, warn) {
   const el = document.getElementById('cam-error');
   el.textContent = msg;
+  el.className = warn ? 'warn' : '';
   el.style.display = msg ? 'block' : 'none';
 }
 
@@ -489,8 +493,19 @@ async function captureFrame() {
     currentScan = { ...extracted, timestamp, thumbBase64: base64 };
     showReviewForm(extracted);
   } catch (e) {
-    setCamError(e.message);
-    document.getElementById('btn-open-cam').style.display = '';
+    const isNetworkBlock = e.message.includes('Network error') || e.message.includes('timed out');
+    if (isNetworkBlock) {
+      // Graceful degradation: show the photo in the review form with blank fields.
+      // User can read the sticker from the thumbnail and type the values manually.
+      currentScan = { mrn: null, name: null, dob: null, timestamp, thumbBase64: base64 };
+      showReviewForm({ mrn: null, name: null, dob: null });
+      setCamError('AI scanning blocked — your network may be filtering this service. '
+        + 'Read the sticker from the photo above and enter the details manually. '
+        + 'Tip: turn off Wi-Fi and use mobile data to enable automatic recognition.', true);
+    } else {
+      setCamError(e.message);
+      document.getElementById('btn-open-cam').style.display = '';
+    }
   }
 
   document.getElementById('scanning-msg').style.display = 'none';
