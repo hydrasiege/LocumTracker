@@ -387,13 +387,25 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  const key = document.getElementById('input-apikey').value.trim();
+  // Strip ALL non-printable and non-ASCII characters — Android keyboards can inject
+  // invisible chars (zero-width spaces, smart quotes, etc.) into password fields.
+  const key = document.getElementById('input-apikey').value.replace(/[^\x21-\x7E]/g, '');
   const url = document.getElementById('input-sheets-url').value.trim();
+  // Write the cleaned key back so the user can see what was actually stored
+  document.getElementById('input-apikey').value = key;
   localStorage.setItem(APIKEY_KEY, key);
   localStorage.setItem(SHEETS_KEY, url);
   updateSetupStatus(key, url);
+  if (!key) {
+    showToast('⚠️ API key is empty', '');
+    return;
+  }
+  if (!key.startsWith('sk-ant-')) {
+    showToast('⚠️ Key saved but looks wrong — should start with sk-ant-', '');
+    return;
+  }
   showToast('Settings saved ✓', 'ok');
-  if (key && url) document.getElementById('setup-panel').open = false;
+  if (url) document.getElementById('setup-panel').open = false;
 }
 
 function updateSetupStatus(key, url) {
@@ -477,10 +489,7 @@ async function captureFrame() {
     currentScan = { ...extracted, timestamp, thumbBase64: base64 };
     showReviewForm(extracted);
   } catch (e) {
-    const msg = e.message.toLowerCase().includes('fetch')
-      ? 'Network error — check your internet connection and try again. If the problem persists, your API key may be invalid.'
-      : 'Scan failed: ' + e.message;
-    setCamError(msg);
+    setCamError(e.message);
     document.getElementById('btn-open-cam').style.display = '';
   }
 
@@ -489,37 +498,85 @@ async function captureFrame() {
 
 // ── Claude API ────────────────────────────────────────────────────────────────
 async function analyzeSticker(base64) {
-  const key = localStorage.getItem(APIKEY_KEY) || '';
-  if (!key) throw new Error('No API key set. Open ⚙️ Setup above and enter your Anthropic key.');
+  const key = (localStorage.getItem(APIKEY_KEY) || '').replace(/[^\x21-\x7E]/g, '');
+  if (!key) {
+    throw new Error('No API key saved. Open ⚙️ Setup, enter your key, and tap Save Settings.');
+  }
+  if (!key.startsWith('sk-ant-')) {
+    throw new Error('API key looks wrong (should start with "sk-ant-"). Re-enter it in ⚙️ Setup.');
+  }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-opus-4-5',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-          { type: 'text',  text: STICKER_PROMPT }
-        ]
-      }]
-    })
+  const payload = JSON.stringify({
+    model: 'claude-opus-4-5',
+    max_tokens: 300,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+        { type: 'text',  text: STICKER_PROMPT }
+      ]
+    }]
   });
 
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  // Attempt up to 2 times — retry once on transient network failure
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 30000); // 30 s hard timeout
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01'
+        },
+        body: payload
+      });
+      clearTimeout(tid);
 
-  const text = (data.content || []).find(b => b.type === 'text')?.text || '{}';
-  try {
-    return JSON.parse(text.replace(/```json|```/g, '').trim());
-  } catch {
-    throw new Error('Could not read sticker. Try again with better lighting or a closer angle.');
+      let data;
+      try { data = await res.json(); }
+      catch { throw new Error('API returned an unreadable response. Try again.'); }
+
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('API key rejected (401 Unauthorized). Re-enter it in ⚙️ Setup.');
+        if (res.status === 429) throw new Error('Rate limit reached. Wait a moment, then try again.');
+        throw new Error('API error ' + res.status + ': ' + (data?.error?.message || 'unknown'));
+      }
+
+      const text = (data.content || []).find(b => b.type === 'text')?.text || '{}';
+      try {
+        return JSON.parse(text.replace(/```json|```/g, '').trim());
+      } catch {
+        throw new Error('Could not read sticker — try better lighting or hold the phone closer.');
+      }
+
+    } catch (e) {
+      clearTimeout(tid);
+
+      if (e.name === 'AbortError') {
+        throw new Error('Request timed out after 30 s. Check your internet connection and try again.');
+      }
+
+      // Only retry on low-level network errors, not on API / logic errors
+      const isNetworkErr = e.message === 'Failed to fetch'
+        || e.message.toLowerCase().includes('networkerror')
+        || e.message.toLowerCase().includes('network request failed');
+
+      if (attempt === 1 && isNetworkErr) {
+        await new Promise(r => setTimeout(r, 1500)); // wait 1.5 s then retry
+        continue;
+      }
+
+      if (isNetworkErr) {
+        throw new Error(
+          'Network error after retry. If you are on hospital Wi-Fi it may block this service — try switching to mobile data.'
+        );
+      }
+
+      throw e; // re-throw API / logic errors unchanged
+    }
   }
 }
 
